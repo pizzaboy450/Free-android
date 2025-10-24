@@ -1,0 +1,36 @@
+name: Windows RDP (Auto-Restart Persistent)
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"  # every 6 hours
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 350
+
+    steps:
+      - name: Download and setup QEMU
+        run: |
+          choco install qemu -y
+          mkdir C:\VM
+          cd C:\VM
+
+      - name: Download Windows Image
+        run: |
+          curl -L -o C:\VM\win.img https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img
+
+      - name: Setup Tailscale
+        run: |
+          choco install tailscale -y
+          Start-Process -FilePath "C:\Program Files\Tailscale\tailscale.exe" -ArgumentList "up -- tskey-auth-kHbeKk2xfw11CNTRL-pGxmsCC3aaXJe8j3t9DBaXEPZwtRRhJN--hostname winvm --accept-routes --accept-dns=true" -NoNewWindow -Wait
+
+      - name: Start Windows VM
+        run: |
+          qemu-system-x86_64 -m 4096 -cpu host -smp 4 -drive file=C:\VM\win.img,format=qcow2 -netdev user,id=net0,hostfwd=tcp::3389-:3389 -device e1000,netdev=net0 -boot d -display none
+
+      - name: Keep VM Alive
+        run: |
+          Write-Host "Windows VM running... Press Ctrl+C to stop."
+          Start-Sleep -Seconds 21600  # 6 hours
